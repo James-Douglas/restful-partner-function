@@ -76,7 +76,7 @@ Resources:
         };
       Handler: index.handler
       Events:
-        PostCalculatorEvent:
+        PostApplyEvent:
           Type: Api
           Properties:
             RestApiId: !Ref RestApi
@@ -85,12 +85,6 @@ Resources:
       Environment:
         Variables:
           ENV: dev
-          ENABLED: true
-          FUNCTION_TYPE: apply
-          FUNCTION_NAME: jd-test
-          VERTICAL: energy
-          VERSION: 1-0-0
-          PROVIDER_CODE: !Ref ProviderCode
 
   # Register a service instance with AWS Cloud map
   CloudMapInstance:
