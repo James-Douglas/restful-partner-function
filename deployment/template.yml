@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Energy Apply Partner Test Stack
+
+Parameters:
+  Env:
+    Type: String
+  ProviderCode:
+    Type: String
+    Default: DODO
+  ApplyCloudMapServiceId:
+    Type: String
+    Description: The AWS Cloud Map service ID where partner function endpoints should be registered
+  SchemaVersion:
+    Type: String
+    Description: The schematic version this function supports
+    Default: 1-0-0
+
+Globals:
+  Function:
+    Runtime: nodejs12.x
+    MemorySize: 512
+    Timeout: 60
+    Tags:
+      VERTICAL: jd-test
+
+Resources:
+
+  RestApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Ref AWS::StackName
+      StageName: v1
+      OpenApiVersion: 3.0.3
+      EndpointConfiguration: PRIVATE
+      MethodSettings:
+        - MetricsEnabled: true
+          DataTraceEnabled: true
+          ResourcePath: "/apply/*"
+          HttpMethod: "*"
+          LoggingLevel: INFO
+      Auth:
+        ResourcePolicy:
+          CustomStatements:
+            - Effect: "Allow"
+              Principal: "*"
+              Action:
+                - "execute-api:Invoke"
+              Resource: "execute-api:/*/*/*"
+
+  ApplyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      InlineCode: |
+        exports.handler = async function(event, context) {
+            console.log("request received: " + JSON.stringify(event));
+
+            var responseBody = {
+                    "@type": "energy/1-0-0/applyResponse",
+                    "applyId": event.headers["APPLY_ID"],
+                    "applyReference": event.headers["APPLY_REFERENCE"],
+                    "responseReceived": new Date().toISOString(),
+                    "status": 200,
+                    "message": "This is a test energy apply partner lambda function deployed behind AWS API gateway",
+                    "partnerReference": "test123"
+                };
+            var response = {
+                    "statusCode": 200,
+                    "headers": {
+                          "Content-Type": "application/json"
+                        },
+                    "body": JSON.stringify(responseBody)
+                };
+
+            return response;
+        };
+      Handler: index.handler
+      Events:
+        PostCalculatorEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref RestApi
+            Path: /apply/test
+            Method: post
+      Environment:
+        Variables:
+          ENV: dev
+          ENABLED: true
+          FUNCTION_TYPE: apply
+          FUNCTION_NAME: jd-test
+          VERTICAL: energy
+          VERSION: 1-0-0
+          PROVIDER_CODE: !Ref ProviderCode
+
+  # Register a service instance with AWS Cloud map
+  CloudMapInstance:
+    Type: AWS::ServiceDiscovery::Instance
+    Properties:
+      InstanceAttributes:
+        ENABLED: true
+        ENDPOINT: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/v1/apply/test"
+        ENV: !Ref Env
+        PROVIDER_CODE: !Ref ProviderCode
+        SERVICE_TYPE: apply
+        VERSION: !Ref SchemaVersion
+        VERTICAL: energy
+      InstanceId: !Ref ProviderCode
+      ServiceId: !Ref ApplyCloudMapServiceId

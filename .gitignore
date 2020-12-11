@@ -1,0 +1,8 @@
+# Intellij files
+.idea
+*.iml
+
+# Cloudformation/ deployment
+cloudformation.yml
+parameters.ini
+SAMvars
